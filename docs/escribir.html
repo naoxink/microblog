@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#14171c" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <title>Escribir · naoxink's microblog</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #14171c;
+      --text: #eceef2;
+      --muted: #9aa2af;
+      --line: #2c313a;
+      --accent: yellowgreen;
+      --danger: tomato;
+      --measure: 38rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: 1.1875rem;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    @media (min-width: 640px) {
+      body { font-size: 1.25rem; }
+    }
+
+    ::selection {
+      background: color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+
+    .wrap {
+      max-width: var(--measure);
+      margin: 0 auto;
+      padding:
+        calc(clamp(2.5rem, 9vw, 5rem) + env(safe-area-inset-top, 0px))
+        1.5rem
+        calc(6rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    header { margin-bottom: clamp(2.5rem, 7vw, 4rem); }
+
+    h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .hl { color: var(--accent); }
+
+    label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    input,
+    textarea {
+      display: block;
+      width: 100%;
+      padding: 0.75rem 0;
+      font: inherit;
+      color: var(--text);
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input:focus,
+    textarea:focus { border-bottom-color: var(--accent); }
+
+    textarea {
+      min-height: 10rem;
+      resize: vertical;
+      overflow-wrap: anywhere;
+    }
+
+    .field + .field { margin-top: 2rem; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.5rem 1rem;
+      margin-top: 1.25rem;
+    }
+
+    .count {
+      font-size: 0.9375rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .count.over { color: var(--danger); }
+
+    button {
+      padding: 0.6rem 1.5rem;
+      font: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--bg);
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    button:hover { filter: brightness(1.08); }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    button:disabled { color: var(--muted); background: transparent; border-color: var(--line); cursor: default; filter: none; }
+
+    .state {
+      min-height: 1.6em;
+      margin: 1.25rem 0 0;
+      font-size: 0.9375rem;
+      color: var(--muted);
+    }
+
+    .state.ok { color: var(--accent); }
+    .state.error { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1><span class="hl">naoxink</span>'s microblog</h1>
+    </header>
+
+    <main>
+      <form id="form" autocomplete="off" novalidate>
+        <div class="field">
+          <label for="token">Token</label>
+          <!-- Sin name y con autocomplete desactivado para que el navegador no lo guarde -->
+          <input id="token" type="password" autocomplete="new-password"
+                 autocapitalize="off" autocorrect="off" spellcheck="false" />
+        </div>
+
+        <div class="field">
+          <label for="content">Publicación</label>
+          <textarea id="content" rows="6" autocomplete="off" required></textarea>
+        </div>
+
+        <div class="actions">
+          <span id="count" class="count">0 / 5000</span>
+          <button id="send" type="submit">Enviar</button>
+        </div>
+
+        <p id="state" class="state" role="status" aria-live="polite"></p>
+      </form>
+    </main>
+  </div>
+
+  <script>
+    // URL de la función en Vercel (está en otro dominio que esta web)
+    const API_URL = 'https://microblog-eosin.vercel.app/api/insert-post'
+    const MAX = 5000
+
+    const form = document.getElementById('form')
+    const tokenEl = document.getElementById('token')
+    const contentEl = document.getElementById('content')
+    const sendEl = document.getElementById('send')
+    const countEl = document.getElementById('count')
+    const stateEl = document.getElementById('state')
+
+    function setState(msg, kind = '') {
+      stateEl.textContent = msg
+      stateEl.className = 'state' + (kind ? ' ' + kind : '')
+    }
+
+    function updateCount() {
+      const n = contentEl.value.trim().length
+      countEl.textContent = `${n} / ${MAX}`
+      countEl.classList.toggle('over', n > MAX)
+    }
+
+    contentEl.addEventListener('input', () => {
+      updateCount()
+      if (stateEl.classList.contains('ok')) setState('')
+    })
+
+    // Ctrl/Cmd + Enter para enviar
+    contentEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        form.requestSubmit()
+      }
+    })
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      if (sendEl.disabled) return
+
+      const token = tokenEl.value.trim()
+      const content = contentEl.value.trim()
+
+      if (!token) { setState('Falta el token.', 'error'); tokenEl.focus(); return }
+      if (!content) { setState('Escribe algo antes de enviar.', 'error'); contentEl.focus(); return }
+      if (content.length > MAX) { setState(`Máximo ${MAX} caracteres.`, 'error'); return }
+
+      sendEl.disabled = true
+      setState('Enviando…')
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ content })
+        })
+
+        if (res.status === 201) {
+          contentEl.value = ''   // el token se queda tal cual
+          updateCount()
+          setState('Publicado.', 'ok')
+          contentEl.focus()
+        } else if (res.status === 401) {
+          setState('Token incorrecto.', 'error')
+        } else if (res.status === 429) {
+          const secs = Number(res.headers.get('Retry-After'))
+          setState(secs ? `Demasiados intentos. Reintenta en ${Math.ceil(secs / 60)} min.` : 'Demasiados intentos.', 'error')
+        } else {
+          let detail = ''
+          try { detail = (await res.json()).error || '' } catch {}
+          setState(detail || `Error ${res.status}.`, 'error')
+        }
+      } catch {
+        setState('No se pudo conectar con la API.', 'error')
+      } finally {
+        sendEl.disabled = false
+      }
+    })
+  </script>
+</body>
+</html>
