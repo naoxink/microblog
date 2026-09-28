@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Microblog</title>
+
+  <!-- Tailwind por CDN (opcional; puedes sustituirlo por tu propio CSS) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>[v-cloak] { display: none; }</style>
+</head>
+<body class="bg-white text-gray-900">
+  <div id="app" v-cloak>
+    <main class="mx-auto max-w-xl px-4 py-10">
+      <h1 class="mb-8 text-2xl font-semibold">Microblog</h1>
+
+      <p v-if="loading" class="text-gray-500">Cargando…</p>
+      <p v-else-if="error" class="text-red-600">{{ error }}</p>
+      <p v-else-if="!posts.length" class="text-gray-500">Aún no hay publicaciones.</p>
+
+      <article v-for="post in posts" :key="post.id" class="mb-6 border-b border-gray-200 pb-6">
+        <p class="whitespace-pre-line">{{ post.content }}</p>
+        <time :datetime="post.created_at" class="mt-2 block text-sm text-gray-500">
+          {{ formatDate(post.created_at) }}
+        </time>
+      </article>
+    </main>
+  </div>
+
+  <!-- Vue 3 (build global) y Supabase (UMD) por CDN -->
+  <script src="https://unpkg.com/vue@3.5/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    // Claves PÚBLICAS: seguras porque RLS solo permite SELECT
+    const SUPABASE_URL = 'https://bvcyenlkdutehkgevrhd.supabase.co'
+    const SUPABASE_ANON_KEY = 'sb_publishable_ZoATFrL7M2UimgxKVPtANg_67VPQq-m'
+
+    // El UMD expone window.supabase; llamamos "db" al cliente para no pisar ese nombre
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    const { createApp, ref, onMounted } = Vue
+
+    createApp({
+      setup() {
+        const posts = ref([])
+        const loading = ref(true)
+        const error = ref(null)
+
+        const formatDate = (iso) =>
+          new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'short' })
+            .format(new Date(iso))
+
+        onMounted(async () => {
+          const { data, error: err } = await db
+            .from('posts')
+            .select('id, content, created_at')
+            .order('created_at', { ascending: false })
+            .limit(50)
+
+          if (err) error.value = 'No se pudieron cargar los posts.'
+          else posts.value = data
+          loading.value = false
+        })
+
+        return { posts, loading, error, formatDate }
+      }
+    }).mount('#app')
+  </script>
+</body>
+</html>
