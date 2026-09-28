@@ -3,67 +3,302 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Microblog</title>
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#f8f9fb" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#14171c" media="(prefers-color-scheme: dark)" />
+  <title>naoxink's microblog</title>
+ 
+  <!-- Atkinson Hyperlegible: tipografía diseñada para máxima legibilidad -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet" />
+ 
+  <style>
+    :root {
+      --bg: #14171c;
+      --text: #eceef2;
+      --muted: #9aa2af;
+      --line: #2c313a;
+      --accent: yellowgreen;
+      --danger: tomato;
+      --measure: 38rem;
+    }
+ 
+    *, *::before, *::after { box-sizing: border-box; }
+ 
+    html { -webkit-text-size-adjust: 100%; }
+ 
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: 1.1875rem;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+ 
+    @media (min-width: 640px) {
+      body { font-size: 1.25rem; }
+    }
+ 
+    ::selection {
+      background: color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+ 
+    [v-cloak] { display: none; }
+ 
+    .wrap {
+      max-width: var(--measure);
+      margin: 0 auto;
+      padding: clamp(2.5rem, 9vw, 5rem) 1.5rem 6rem;
+    }
+ 
+    header { margin-bottom: clamp(2.5rem, 7vw, 4rem); }
+ 
+    h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+ 
+    .state { margin: 0; color: var(--muted); }
+    .state.error { color: var(--danger); }
+ 
+    /* Feed: una fila por post, separadas por líneas finas */
+    .timeline {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      border-top: 1px solid var(--line);
+    }
 
-  <!-- Tailwind por CDN (opcional; puedes sustituirlo por tu propio CSS) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>[v-cloak] { display: none; }</style>
+    .post {
+      padding: 1.25rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .text {
+      margin: 0;
+      white-space: pre-line;
+      overflow-wrap: anywhere;
+    }
+
+    .meta {
+      display: block;
+      margin-top: 0.5rem;
+      font-size: 0.9375rem;
+      line-height: 1.4;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .more-btn {
+      display: block;
+      width: 100%;
+      padding: 1.25rem 0;
+      font: inherit;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: none;
+      border: 0;
+      cursor: pointer;
+    }
+
+    .more-btn:hover { text-decoration: underline; }
+    .more-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .more-btn:disabled { color: var(--muted); cursor: default; text-decoration: none; }
+
+    .more .state { padding-top: 1.25rem; text-align: center; }
+
+    .hl { color: var(--accent); }
+
+    .to-top {
+      position: fixed;
+      right: max(1rem, env(safe-area-inset-right));
+      bottom: max(1rem, env(safe-area-inset-bottom));
+      display: grid;
+      place-items: center;
+      width: 3rem;
+      height: 3rem;
+      color: var(--accent);
+      background: var(--bg);
+      border: 1px solid var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(0.5rem);
+      transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
+    }
+
+    .to-top.visible {
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+    }
+
+    .to-top:hover { border-color: var(--muted); }
+    .to-top:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .to-top { transition: none; }
+    }
+
+    /* Un único fundido al cargar, sin movimiento por elemento */
+    @media (prefers-reduced-motion: no-preference) {
+      .timeline { animation: fade-in 0.5s ease-out both; }
+      @keyframes fade-in { from { opacity: 0; } }
+    }
+
+    /* Escritorio: botón centrado abajo, alineado con la columna */
+    @media (min-width: 640px) {
+      .to-top {
+        left: 0;
+        right: 0;
+        margin-inline: auto;
+        bottom: 1.5rem;
+      }
+    }
+  </style>
 </head>
-<body class="bg-white text-gray-900">
+<body>
   <div id="app" v-cloak>
-    <main class="mx-auto max-w-xl px-4 py-10">
-      <h1 class="mb-8 text-2xl font-semibold">Microblog</h1>
+    <div class="wrap">
+      <header>
+        <h1><span class="hl">naoxink</span>'s microblog</h1>
+      </header>
+ 
+      <main>
+        <p v-if="loading" class="state" role="status">Cargando…</p>
+        <p v-else-if="error" class="state error" role="alert">{{ error }}</p>
+        <p v-else-if="!posts.length" class="state">Aún no hay publicaciones.</p>
+ 
+        <ol v-else class="timeline">
+          <li v-for="post in posts" :key="post.id" class="post">
+            <p class="text">{{ post.content }}</p>
+            <time class="meta" :datetime="post.created_at" :title="fullDate(post.created_at)">
+              {{ displayDate(post.created_at) }}
+            </time>
+          </li>
+        </ol>
 
-      <p v-if="loading" class="text-gray-500">Cargando…</p>
-      <p v-else-if="error" class="text-red-600">{{ error }}</p>
-      <p v-else-if="!posts.length" class="text-gray-500">Aún no hay publicaciones.</p>
-
-      <article v-for="post in posts" :key="post.id" class="mb-6 border-b border-gray-200 pb-6">
-        <p class="whitespace-pre-line">{{ post.content }}</p>
-        <time :datetime="post.created_at" class="mt-2 block text-sm text-gray-500">
-          {{ formatDate(post.created_at) }}
-        </time>
-      </article>
-    </main>
+        <div v-if="hasMore || moreError" class="more">
+          <p v-if="moreError" class="state error" role="alert">No se pudieron cargar más posts.</p>
+          <button type="button" class="more-btn" :disabled="loadingMore" @click="loadMore">
+            {{ loadingMore ? 'Cargando…' : moreError ? 'Reintentar' : 'Cargar más' }}
+          </button>
+        </div>
+      </main>
+    </div>
+    <button type="button" class="to-top" :class="{ visible: showTop }"
+            aria-label="Volver arriba" @click="scrollToTop">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none"
+          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 19V5M5 12l7-7 7 7" />
+      </svg>
+    </button>
   </div>
-
+ 
   <!-- Vue 3 (build global) y Supabase (UMD) por CDN -->
   <script src="https://unpkg.com/vue@3.5/dist/vue.global.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+ 
   <script>
     // Claves PÚBLICAS: seguras porque RLS solo permite SELECT
     const SUPABASE_URL = 'https://bvcyenlkdutehkgevrhd.supabase.co'
     const SUPABASE_ANON_KEY = 'sb_publishable_ZoATFrL7M2UimgxKVPtANg_67VPQq-m'
 
-    // El UMD expone window.supabase; llamamos "db" al cliente para no pisar ese nombre
     const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-
+ 
     const { createApp, ref, onMounted } = Vue
+ 
+    const rtf = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
+    const fullFmt = new Intl.DateTimeFormat('es-ES', { dateStyle: 'full', timeStyle: 'short' })
+ 
+    // Relativo durante el primer día ("hace 5 minutos"); después, fecha corta
+    function displayDate(iso) {
+      const d = new Date(iso)
+      const diff = Math.min(0, (d - Date.now()) / 1000)
+      const abs = Math.abs(diff)
+ 
+      if (abs < 60) return 'Ahora mismo'
+      if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute')
+      if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour')
+ 
+      const sameYear = d.getFullYear() === new Date().getFullYear()
+      return new Intl.DateTimeFormat('es-ES', {
+        day: 'numeric',
+        month: 'short',
+        ...(sameYear ? {} : { year: 'numeric' }),
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(d)
+    }
+ 
+    const fullDate = (iso) => fullFmt.format(new Date(iso))
+ 
+    const PAGE_SIZE = 25
 
     createApp({
       setup() {
         const posts = ref([])
-        const loading = ref(true)
-        const error = ref(null)
+        const loading = ref(true)        // carga inicial
+        const loadingMore = ref(false)   // cargando una página
+        const hasMore = ref(false)
+        const error = ref(null)          // error en la carga inicial
+        const moreError = ref(false)     // error al cargar más
 
-        const formatDate = (iso) =>
-          new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'short' })
-            .format(new Date(iso))
+        async function loadMore() {
+          if (loadingMore.value) return
+          loadingMore.value = true
+          moreError.value = false
 
-        onMounted(async () => {
-          const { data, error: err } = await db
+          // Pedimos un post extra para saber si quedan más sin hacer otra consulta
+          let query = db
             .from('posts')
             .select('id, content, created_at')
             .order('created_at', { ascending: false })
-            .limit(50)
+            .limit(PAGE_SIZE + 1)
 
-          if (err) error.value = 'No se pudieron cargar los posts.'
-          else posts.value = data
+          // Cursor: solo posts más antiguos que el último cargado
+          const last = posts.value[posts.value.length - 1]
+          if (last) query = query.lt('created_at', last.created_at)
+
+          const { data, error: err } = await query
+
+          if (err) {
+            if (posts.value.length) moreError.value = true
+            else error.value = 'No se pudieron cargar los posts. Recarga la página para reintentar.'
+          } else {
+            hasMore.value = data.length > PAGE_SIZE
+            posts.value.push(...data.slice(0, PAGE_SIZE))
+          }
+
           loading.value = false
+          loadingMore.value = false
+        }
+
+        const showTop = ref(false)
+        const onScroll = () => { showTop.value = window.scrollY > 600 }
+
+        onMounted(() => {
+          window.addEventListener('scroll', onScroll, { passive: true })
+          onScroll()
         })
 
-        return { posts, loading, error, formatDate }
+        function scrollToTop() {
+          const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
+        }
+
+        onMounted(loadMore)
+
+        return { posts, loading, loadingMore, hasMore, error, moreError, loadMore, showTop, scrollToTop, displayDate, fullDate }
       }
     }).mount('#app')
   </script>
