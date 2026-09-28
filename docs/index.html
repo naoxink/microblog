@@ -3,10 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="light dark" />
-  <meta name="theme-color" content="#f8f9fb" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#14171c" media="(prefers-color-scheme: dark)" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#14171c" />
   <title>naoxink's microblog</title>
+ 
+  <!-- Metadatos para buscadores y vista previa al compartir el enlace -->
+  <meta name="description" content="Microblog personal de naoxink." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="naoxink's microblog" />
+  <meta property="og:title" content="naoxink's microblog" />
+  <meta property="og:description" content="Microblog personal de naoxink." />
+  <meta property="og:locale" content="es_ES" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="naoxink's microblog" />
+  <meta name="twitter:description" content="Microblog personal de naoxink." />
+  <!-- Cuando tengas el dominio final, añade también:
+  <meta property="og:url" content="https://TU-DOMINIO/" />
+  <meta property="og:image" content="https://TU-DOMINIO/og.png" />
+  -->
  
   <!-- Atkinson Hyperlegible: tipografía diseñada para máxima legibilidad -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -15,6 +29,7 @@
  
   <style>
     :root {
+      color-scheme: dark;
       --bg: #14171c;
       --text: #eceef2;
       --muted: #9aa2af;
@@ -68,7 +83,7 @@
     .state { margin: 0; color: var(--muted); }
     .state.error { color: var(--danger); }
  
-    /* Barra de filtro activo (búsqueda por hashtag) */
+    /* Barra de filtro activo (hashtag o publicación individual) */
     .filter {
       display: flex;
       flex-wrap: wrap;
@@ -119,14 +134,40 @@
     .tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
     .tag.active { font-weight: 700; }
  
+    /* Fila inferior del post: fecha (enlace permanente) y compartir */
     .meta {
-      display: block;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0 1.25rem;
       margin-top: 0.5rem;
       font-size: 0.9375rem;
       line-height: 1.4;
       color: var(--muted);
       font-variant-numeric: tabular-nums;
     }
+ 
+    .permalink,
+    .share-btn {
+      padding: 0.25rem 0;
+      color: inherit;
+      text-decoration: none;
+    }
+ 
+    .permalink:hover,
+    .share-btn:hover { color: var(--text); text-decoration: underline; }
+ 
+    .permalink:focus-visible,
+    .share-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+ 
+    .share-btn {
+      font: inherit;
+      background: none;
+      border: 0;
+      cursor: pointer;
+    }
+ 
+    .share-btn.done { color: var(--accent); text-decoration: none; }
  
     .more-btn {
       display: block;
@@ -202,27 +243,34 @@
   <div id="app" v-cloak>
     <div class="wrap">
       <header>
-        <h1><a :href="baseUrl" style="color: inherit; text-decoration: none" @click.prevent="clearTag"><span class="hl">naoxink</span>'s microblog</a></h1>
+        <h1><a :href="baseUrl" style="color: inherit; text-decoration: none" @click.prevent="clearFilter"><span class="hl">naoxink</span>'s microblog</a></h1>
       </header>
  
       <main>
-        <div v-if="tag" class="filter">
-          <p>Publicaciones con <strong class="hl">#{{ tag }}</strong></p>
-          <a :href="baseUrl" @click.prevent="clearTag">Ver todos</a>
+        <div v-if="tag || postId" class="filter">
+          <p v-if="tag">Publicaciones con <strong class="hl">#{{ tag }}</strong></p>
+          <p v-else>Publicación individual</p>
+          <a :href="baseUrl" @click.prevent="clearFilter">Ver todos</a>
         </div>
  
         <p v-if="loading" class="state" role="status">Cargando…</p>
         <p v-else-if="error" class="state error" role="alert">{{ error }}</p>
         <p v-else-if="!posts.length" class="state">
-          {{ tag ? 'No hay publicaciones con #' + tag + '.' : 'Aún no hay publicaciones.' }}
+          {{ postId ? 'Esta publicación no existe.' : tag ? 'No hay publicaciones con #' + tag + '.' : 'Aún no hay publicaciones.' }}
         </p>
  
         <ol v-else class="timeline">
           <li v-for="post in posts" :key="post.id" class="post">
             <p class="text"><template v-for="(part, i) in post.parts" :key="i"><a v-if="part.tag" class="tag" :class="{ active: part.tag.toLowerCase() === tag }" :href="tagUrl(part.tag)" @click="openTag(part.tag, $event)">{{ part.text }}</a><template v-else>{{ part.text }}</template></template></p>
-            <time class="meta" :datetime="post.created_at" :title="fullDate(post.created_at)">
-              {{ displayDate(post.created_at) }}
-            </time>
+            <div class="meta">
+              <a class="permalink" :href="postUrl(post.id)" @click="openPost(post.id, $event)">
+                <time :datetime="post.created_at" :title="fullDate(post.created_at)">{{ displayDate(post.created_at) }}</time>
+              </a>
+              <button type="button" class="share-btn" :class="{ done: copiedId === post.id }"
+                      aria-live="polite" @click="share(post)">
+                {{ copiedId === post.id ? 'Enlace copiado' : 'Compartir' }}
+              </button>
+            </div>
           </li>
         </ol>
  
@@ -256,6 +304,8 @@
  
     const { createApp, ref, watch, onMounted } = Vue
  
+    const SITE_TITLE = "naoxink's microblog"
+ 
     const rtf = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
     const fullFmt = new Intl.DateTimeFormat('es-ES', { dateStyle: 'full', timeStyle: 'short' })
  
@@ -281,6 +331,12 @@
  
     const fullDate = (iso) => fullFmt.format(new Date(iso))
  
+    // Texto en una sola línea y recortado (para títulos y para compartir)
+    function excerpt(text, max) {
+      const one = text.replace(/\s+/g, ' ').trim()
+      return one.length > max ? one.slice(0, max - 1) + '…' : one
+    }
+ 
     // ---- Hashtags ----
     // Como en X/Bluesky: letras, números y _, con al menos una letra (#123 no cuenta),
     // y sin carácter de palabra delante (así "a#b" o una URL con #ancla no son hashtags).
@@ -301,35 +357,78 @@
       return parts
     }
  
-    // El hashtag activo vive en la URL (?tag=foo): enlazable y con botón "atrás" funcional
-    function readTag() {
-      const t = (new URLSearchParams(location.search).get('tag') || '').replace(/^#/, '').toLowerCase()
+    // El estado vive en la URL: ?tag=foo (filtro) o ?post=<id> (permalink).
+    // Así es enlazable y el botón "atrás" funciona. Si vienen los dos, manda ?post.
+    const POST_ID_RE = /^[\w-]{1,64}$/
+ 
+    function readState() {
+      const q = new URLSearchParams(location.search)
+ 
+      const post = q.get('post') || ''
+      if (POST_ID_RE.test(post)) return { tag: '', post }
+ 
+      const t = (q.get('tag') || '').replace(/^#/, '').toLowerCase()
       // Se valida porque acaba dentro de una expresión regular en la consulta
-      return t.length <= 64 && TAG_VALID.test(t) ? t : ''
+      return { tag: t.length <= 64 && TAG_VALID.test(t) ? t : '', post: '' }
     }
  
     const baseUrl = location.pathname
     const tagUrl = (t) => `${baseUrl}?tag=${encodeURIComponent(t.toLowerCase())}`
+    const postUrl = (id) => `${baseUrl}?post=${encodeURIComponent(id)}`
+ 
+    // Clic normal (los modificadores dejan que el navegador abra otra pestaña)
+    const isPlainClick = (e) => !(e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
  
     const PAGE_SIZE = 25
  
     createApp({
       setup() {
+        const initial = readState()
+ 
         const posts = ref([])
         const loading = ref(true)        // carga inicial
         const loadingMore = ref(false)   // cargando una página
         const hasMore = ref(false)
         const error = ref(null)          // error en la carga inicial
         const moreError = ref(false)     // error al cargar más
-        const tag = ref(readTag())       // hashtag filtrado ('' = todos)
+        const tag = ref(initial.tag)     // hashtag filtrado ('' = todos)
+        const postId = ref(initial.post) // permalink activo ('' = feed)
+        const copiedId = ref(null)       // post cuyo enlace se acaba de copiar
  
         let gen = 0                      // descarta respuestas de consultas obsoletas
+        let copiedTimer
+ 
+        // Publicación individual (permalink)
+        async function loadOne() {
+          const myGen = gen
+          const { data, error: err } = await db
+            .from('posts')
+            .select('id, content, created_at')
+            .eq('id', postId.value)
+            .maybeSingle()
+          if (myGen !== gen) return
+ 
+          // 22P02: el id no tiene formato válido para la columna → equivale a "no existe"
+          if (err && err.code !== '22P02') {
+            error.value = 'No se pudo cargar la publicación. Recarga la página para reintentar.'
+          } else if (data) {
+            posts.value = [{ ...data, parts: parseContent(data.content) }]
+            document.title = `${excerpt(data.content, 60)} · ${SITE_TITLE}`
+          }
+ 
+          hasMore.value = false
+          loading.value = false
+          loadingMore.value = false
+        }
  
         async function loadMore() {
           if (loadingMore.value) return
-          const myGen = gen
           loadingMore.value = true
           moreError.value = false
+ 
+          if (postId.value) return loadOne()
+ 
+          const myGen = gen
  
           // Pedimos un post extra para saber si quedan más sin hacer otra consulta
           let query = db
@@ -337,7 +436,7 @@
             .select('id, content, created_at')
             .order('created_at', { ascending: false })
             .limit(PAGE_SIZE + 1)
-
+ 
           // Filtro por hashtag: "#tag" completo, sin distinguir mayúsculas
           // (no coincide con #tagging ni con "a#tag")
           if (tag.value) {
@@ -349,7 +448,7 @@
           if (last) query = query.lt('created_at', last.created_at)
  
           const { data, error: err } = await query
-          if (myGen !== gen) return      // mientras tanto se cambió de hashtag
+          if (myGen !== gen) return      // mientras tanto se cambió de vista
  
           if (err) {
             if (posts.value.length) moreError.value = true
@@ -363,7 +462,7 @@
           loadingMore.value = false
         }
  
-        // Vacía el feed y vuelve a cargar desde el principio con el filtro actual
+        // Vacía el feed y vuelve a cargar desde el principio con la vista actual
         function reload() {
           gen++
           posts.value = []
@@ -375,25 +474,61 @@
           loadMore()
         }
  
-        function setTag(t, url) {
-          if (t === tag.value) return
+        // Cambia de vista (feed, hashtag o permalink) y sincroniza la URL
+        function go(t, p, url) {
+          if (t === tag.value && p === postId.value) return
           history.pushState(null, '', url)
           tag.value = t
+          postId.value = p
           window.scrollTo(0, 0)
           reload()
         }
  
         function openTag(t, e) {
-          // Ctrl/Cmd/Shift/clic central: que el navegador abra el enlace en otra pestaña
-          if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+          if (!isPlainClick(e)) return
           e.preventDefault()
-          setTag(t.toLowerCase(), tagUrl(t))
+          go(t.toLowerCase(), '', tagUrl(t))
         }
  
-        function clearTag() { setTag('', baseUrl) }
+        function openPost(id, e) {
+          if (!isPlainClick(e)) return
+          e.preventDefault()
+          go('', String(id), postUrl(id))
+        }
  
-        watch(tag, (t) => {
-          document.title = t ? `#${t} · naoxink's microblog` : "naoxink's microblog"
+        function clearFilter() { go('', '', baseUrl) }
+ 
+        // ---- Compartir ----
+        async function copyLink(id, url) {
+          try {
+            await navigator.clipboard.writeText(url)
+            copiedId.value = id
+            clearTimeout(copiedTimer)
+            copiedTimer = setTimeout(() => { copiedId.value = null }, 2000)
+          } catch {
+            window.prompt('Copia el enlace:', url)
+          }
+        }
+ 
+        async function share(post) {
+          const url = new URL(postUrl(post.id), location.origin).href
+ 
+          // Hoja nativa de compartir (móvil y Safari); si no existe, copiamos el enlace
+          if (navigator.share) {
+            try {
+              await navigator.share({ title: SITE_TITLE, text: excerpt(post.content, 120), url })
+            } catch (e) {
+              // AbortError = la persona cerró la hoja: no hay nada que hacer
+              if (e.name !== 'AbortError') copyLink(post.id, url)
+            }
+            return
+          }
+          copyLink(post.id, url)
+        }
+ 
+        watch([tag, postId], ([t]) => {
+          // El título de un permalink se fija al cargar la publicación (loadOne)
+          document.title = t ? `#${t} · ${SITE_TITLE}` : SITE_TITLE
         }, { immediate: true })
  
         const showTop = ref(false)
@@ -402,8 +537,12 @@
         onMounted(() => {
           window.addEventListener('scroll', onScroll, { passive: true })
           window.addEventListener('popstate', () => {
-            const t = readTag()
-            if (t !== tag.value) { tag.value = t; reload() }
+            const s = readState()
+            if (s.tag !== tag.value || s.post !== postId.value) {
+              tag.value = s.tag
+              postId.value = s.post
+              reload()
+            }
           })
           onScroll()
           loadMore()
@@ -416,7 +555,8 @@
  
         return {
           posts, loading, loadingMore, hasMore, error, moreError, loadMore,
-          tag, openTag, clearTag, baseUrl, tagUrl,
+          tag, postId, openTag, openPost, clearFilter, baseUrl, tagUrl, postUrl,
+          share, copiedId,
           showTop, scrollToTop, displayDate, fullDate
         }
       }
