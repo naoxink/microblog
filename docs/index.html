@@ -194,6 +194,21 @@
     .more-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .more-btn:disabled { color: var(--muted); cursor: default; text-decoration: none; }
  
+    .random-btn {
+      margin-top: 0.75rem;
+      padding: 0.25rem 0;
+      font: inherit;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: none;
+      border: 0;
+      cursor: pointer;
+    }
+    .random-btn:hover { text-decoration: underline; }
+    .random-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+    .random-btn:disabled { color: var(--muted); cursor: default; text-decoration: none; }
+
     .more .state { padding-top: 1.25rem; text-align: center; }
  
     .hl { color: var(--accent); }
@@ -252,6 +267,9 @@
     <div class="wrap">
       <header>
         <h1><a :href="baseUrl" style="color: inherit; text-decoration: none" @click.prevent="clearFilter"><span class="hl">naoxink</span>'s microblog</a></h1>
+        <button type="button" class="random-btn" :disabled="randomLoading" @click="openRandom">
+          {{ randomLoading ? 'Buscando…' : '🎲 Post aleatorio' }}
+        </button>
       </header>
  
       <main>
@@ -506,6 +524,32 @@
  
         function clearFilter() { go('', '', baseUrl) }
  
+        const randomLoading = ref(false)
+
+        // Post aleatorio: cuenta los posts y pide uno con offset al azar
+        async function openRandom() {
+          if (randomLoading.value) return
+          randomLoading.value = true
+          try {
+            const { count, error: e1 } = await db
+              .from('posts')
+              .select('id', { count: 'exact', head: true })
+            if (e1 || !count) return
+
+            const offset = Math.floor(Math.random() * count)
+            const { data, error: e2 } = await db
+              .from('posts')
+              .select('id')
+              .order('created_at', { ascending: false })
+              .range(offset, offset)
+            if (e2 || !data?.length) return
+
+            go('', String(data[0].id), postUrl(data[0].id))
+          } finally {
+            randomLoading.value = false
+          }
+        }
+
         // ---- Compartir ----
         async function copyLink(id, url) {
           try {
@@ -565,7 +609,8 @@
           posts, loading, loadingMore, hasMore, error, moreError, loadMore,
           tag, postId, openTag, openPost, clearFilter, baseUrl, tagUrl, postUrl,
           share, copiedId,
-          showTop, scrollToTop, displayDate, fullDate
+          showTop, scrollToTop, displayDate, fullDate,
+          openRandom, randomLoading
         }
       }
     }).mount('#app')
