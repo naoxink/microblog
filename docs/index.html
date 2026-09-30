@@ -510,7 +510,19 @@
           if (postId.value) return loadOne()
 
           const myGen = gen
-          let query = db /* ...igual que antes... */
+
+          // Pedimos un post extra para saber si quedan más sin hacer otra consulta
+          let query = db
+            .from('posts')
+            .select('id, content, created_at')
+            .order('created_at', { ascending: false })
+            .limit(PAGE_SIZE + 1)
+
+          // Filtro por hashtag: "#tag" completo, sin distinguir mayúsculas
+          // (no coincide con #tagging ni con "a#tag")
+          if (tag.value) {
+            query = query.filter('content', 'imatch', `(^|[^[:alnum:]_&/#])#${tag.value}([^[:alnum:]_]|$)`)
+          }
 
           // Cursor: en modo fresco se parte desde el principio
           const last = fresh ? null : posts.value[posts.value.length - 1]
@@ -531,7 +543,8 @@
 
           loading.value = false
           loadingMore.value = false
-        } 
+        }
+
         // Vacía el feed y vuelve a cargar desde el principio con la vista actual
         function reload() {
           gen++
