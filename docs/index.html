@@ -26,12 +26,12 @@
   <meta property="og:url" content="https://TU-DOMINIO/" />
   <meta property="og:image" content="https://TU-DOMINIO/og.png" />
   -->
- 
+
   <!-- Atkinson Hyperlegible: tipografía diseñada para máxima legibilidad -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet" />
- 
+
   <style>
     :root {
       color-scheme: dark;
@@ -43,11 +43,11 @@
       --danger: tomato;
       --measure: 38rem;
     }
- 
+
     *, *::before, *::after { box-sizing: border-box; }
- 
+
     html { -webkit-text-size-adjust: 100%; }
- 
+
     body {
       margin: 0;
       background: var(--bg);
@@ -58,17 +58,17 @@
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
     }
- 
+
     @media (min-width: 640px) {
       body { font-size: 1.25rem; }
     }
- 
+
     ::selection {
       background: color-mix(in srgb, var(--accent) 30%, transparent);
     }
- 
+
     [v-cloak] { display: none; }
- 
+
     .wrap {
       max-width: var(--measure);
       margin: 0 auto;
@@ -77,9 +77,9 @@
         1.5rem
         6rem;
     }
- 
+
     header { margin-bottom: clamp(2.5rem, 7vw, 4rem); }
- 
+
     h1 {
       margin: 0;
       font-size: 1.75rem;
@@ -87,10 +87,10 @@
       letter-spacing: -0.02em;
       line-height: 1.2;
     }
- 
+
     .state { margin: 0; color: var(--muted); }
     .state.error { color: var(--danger); }
- 
+
     /* Barra de filtro activo (hashtag o publicación individual) */
     .filter {
       display: flex;
@@ -100,19 +100,19 @@
       gap: 0.25rem 1rem;
       margin-bottom: 1.25rem;
     }
- 
+
     .filter p { margin: 0; overflow-wrap: anywhere; }
- 
+
     .filter a {
       font-size: 0.9375rem;
       font-weight: 700;
       color: var(--accent);
       text-decoration: none;
     }
- 
+
     .filter a:hover { text-decoration: underline; }
     .filter a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
- 
+
     /* Feed: una fila por post, separadas por líneas finas */
     .timeline {
       list-style: none;
@@ -120,28 +120,52 @@
       padding: 0;
       border-top: 1px solid var(--line);
     }
- 
+
     .post {
       padding: 1.25rem 0;
       border-bottom: 1px solid var(--line);
     }
- 
+
     .text {
       margin: 0;
       white-space: pre-line;
       overflow-wrap: anywhere;
     }
- 
+
     /* Hashtags dentro del texto */
     .tag {
       color: var(--accent);
       text-decoration: none;
     }
- 
+
     .tag:hover { text-decoration: underline; }
     .tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
     .tag.active { font-weight: 700; }
- 
+
+    /* Enlaces: externos con subrayado y flecha; propios (naoxink.github.io) en acento con ◆ */
+    .link {
+      color: var(--text);
+      text-decoration: underline;
+      text-decoration-color: var(--accent);
+      text-underline-offset: 0.2em;
+    }
+    .link:hover { color: var(--accent); }
+    .link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+    .link:not(.own)::after {
+      content: "↗";
+      margin-left: 0.15em;
+      font-size: 0.8em;
+      color: var(--muted);
+    }
+    .link.own { color: var(--accent); font-weight: 700; text-decoration: none; }
+    .link.own:hover { text-decoration: underline; }
+    .link.own::before {
+      content: "◆";
+      margin-right: 0.3em;
+      font-size: 0.6em;
+      vertical-align: 0.2em;
+    }
+
     /* Fila inferior del post: fecha (enlace permanente) y compartir */
     .meta {
       display: flex;
@@ -154,29 +178,29 @@
       color: var(--muted);
       font-variant-numeric: tabular-nums;
     }
- 
+
     .permalink,
     .share-btn {
       padding: 0.25rem 0;
       color: inherit;
       text-decoration: none;
     }
- 
+
     .permalink:hover,
     .share-btn:hover { color: var(--text); text-decoration: underline; }
- 
+
     .permalink:focus-visible,
     .share-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
- 
+
     .share-btn {
       font: inherit;
       background: none;
       border: 0;
       cursor: pointer;
     }
- 
+
     .share-btn.done { color: var(--accent); text-decoration: none; }
- 
+
     .more-btn {
       display: block;
       width: 100%;
@@ -189,11 +213,11 @@
       border: 0;
       cursor: pointer;
     }
- 
+
     .more-btn:hover { text-decoration: underline; }
     .more-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .more-btn:disabled { color: var(--muted); cursor: default; text-decoration: none; }
- 
+
     .random-btn {
       margin-top: 0.75rem;
       padding: 0.25rem 0;
@@ -210,9 +234,9 @@
     .random-btn:disabled { color: var(--muted); cursor: default; text-decoration: none; }
 
     .more .state { padding-top: 1.25rem; text-align: center; }
- 
+
     .hl { color: var(--accent); }
- 
+
     .to-top {
       position: fixed;
       right: max(1rem, env(safe-area-inset-right));
@@ -231,26 +255,26 @@
       transform: translateY(0.5rem);
       transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
     }
- 
+
     .to-top.visible {
       opacity: 1;
       visibility: visible;
       transform: none;
     }
- 
+
     .to-top:hover { border-color: var(--muted); }
     .to-top:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
- 
+
     @media (prefers-reduced-motion: reduce) {
       .to-top { transition: none; }
     }
- 
+
     /* Un único fundido al cargar, sin movimiento por elemento */
     @media (prefers-reduced-motion: no-preference) {
       .timeline { animation: fade-in 0.5s ease-out both; }
       @keyframes fade-in { from { opacity: 0; } }
     }
- 
+
     /* Escritorio: botón centrado abajo, alineado con la columna */
     @media (min-width: 640px) {
       .to-top {
@@ -323,23 +347,23 @@
           {{ randomLoading ? 'Buscando…' : '🎲 Post aleatorio' }}
         </button>
       </header>
- 
+
       <main>
         <div v-if="tag || postId" class="filter">
           <p v-if="tag">Publicaciones con <strong class="hl">#{{ tag }}</strong></p>
           <p v-else>Publicación individual</p>
           <a :href="baseUrl" @click.prevent="clearFilter">Ver todos</a>
         </div>
- 
+
         <p v-if="loading" class="state" role="status">Cargando…</p>
         <p v-else-if="error" class="state error" role="alert">{{ error }}</p>
         <p v-else-if="!posts.length" class="state">
           {{ postId ? 'Esta publicación no existe.' : tag ? 'No hay publicaciones con #' + tag + '.' : 'Aún no hay publicaciones.' }}
         </p>
- 
+
         <ol v-else class="timeline">
           <li v-for="post in posts" :key="post.id" class="post">
-            <p class="text" :data-id="post.id" :class="{ clamped: isClamped(post.id) }"><template v-for="(part, i) in post.parts" :key="i"><a v-if="part.tag" class="tag" :class="{ active: part.tag.toLowerCase() === tag }" :href="tagUrl(part.tag)" @click="openTag(part.tag, $event)">{{ part.text }}</a><template v-else>{{ part.text }}</template></template></p>
+            <p class="text" :data-id="post.id" :class="{ clamped: isClamped(post.id) }"><template v-for="(part, i) in post.parts" :key="i"><a v-if="part.tag" class="tag" :class="{ active: part.tag.toLowerCase() === tag }" :href="tagUrl(part.tag)" @click="openTag(part.tag, $event)">{{ part.text }}</a><a v-else-if="part.href" class="link" :class="{ own: part.own }" :href="part.href" target="_blank" rel="noopener noreferrer" :title="part.href">{{ part.text }}</a><template v-else>{{ part.text }}</template></template></p>
             <button v-if="canExpand(post.id)" type="button" class="expand-btn"
                     aria-expanded="false" @click="expand(post.id)">Ver completa</button>
             <div class="meta">
@@ -354,7 +378,7 @@
             </div>
           </li>
         </ol>
- 
+
         <div v-if="hasMore || moreError" class="more">
           <p v-if="moreError" class="state error" role="alert">No se pudieron cargar más posts.</p>
           <button type="button" class="more-btn" :disabled="loadingMore" @click="loadMore()">
@@ -371,35 +395,35 @@
       </svg>
     </button>
   </div>
- 
+
   <!-- Vue 3 (build global) y Supabase (UMD) por CDN -->
   <script src="https://unpkg.com/vue@3.5/dist/vue.global.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- 
+
   <script>
     // Claves PÚBLICAS: seguras porque RLS solo permite SELECT
     const SUPABASE_URL = 'https://bvcyenlkdutehkgevrhd.supabase.co'
     const SUPABASE_ANON_KEY = 'sb_publishable_ZoATFrL7M2UimgxKVPtANg_67VPQq-m'
 
     const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
- 
+
     const { createApp, ref, watch, onMounted } = Vue
- 
+
     const SITE_TITLE = "naoxink's microblog"
- 
+
     const rtf = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
     const fullFmt = new Intl.DateTimeFormat('es-ES', { dateStyle: 'full', timeStyle: 'short' })
- 
+
     // Relativo durante el primer día ("hace 5 minutos"); después, fecha corta
     function displayDate(iso) {
       const d = new Date(iso)
       const diff = Math.min(0, (d - Date.now()) / 1000)
       const abs = Math.abs(diff)
- 
+
       if (abs < 60) return 'Ahora mismo'
       if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute')
       if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour')
- 
+
       const sameYear = d.getFullYear() === new Date().getFullYear()
       return new Intl.DateTimeFormat('es-ES', {
         day: 'numeric',
@@ -409,24 +433,53 @@
         minute: '2-digit'
       }).format(d)
     }
- 
+
     const fullDate = (iso) => fullFmt.format(new Date(iso))
- 
+
     // Texto en una sola línea y recortado (para títulos y para compartir)
     function excerpt(text, max) {
       const one = text.replace(/\s+/g, ' ').trim()
       return one.length > max ? one.slice(0, max - 1) + '…' : one
     }
- 
+
     // ---- Hashtags ----
     // Como en X/Bluesky: letras, números y _, con al menos una letra (#123 no cuenta),
     // y sin carácter de palabra delante (así "a#b" o una URL con #ancla no son hashtags).
     const HASHTAG_RE = /(^|[^\p{L}\p{N}_&\/#])#([\p{L}\p{N}_]*\p{L}[\p{L}\p{N}_]*)/gu
     const TAG_VALID = /^[\p{L}\p{N}_]*\p{L}[\p{L}\p{N}_]*$/u
- 
-    // Divide el texto en trozos { text } y { text, tag }. Se renderiza sin v-html (sin riesgo de XSS).
-    function parseContent(text) {
-      const parts = []
+    // ---- Enlaces ----
+    const OWN_HOST = 'naoxink.github.io'   // proyectos propios
+    const URL_RE = /https?:\/\/[^\s<>"]+/gi
+    const TRAIL_RE = /[.,;:!?'"»”’]+$/
+    const prettyPath = (s) => { try { return decodeURI(s) } catch { return s } }
+
+    // Quita la puntuación que suele pegarse al final ("mira https://x.com.", "(https://x.com)")
+    function trimUrl(raw) {
+      let url = raw.replace(TRAIL_RE, '')
+      while (url.endsWith(')') && (url.match(/\)/g).length > (url.match(/\(/g) || []).length)) {
+        url = url.slice(0, -1).replace(TRAIL_RE, '')
+      }
+      return url
+    }
+
+    // Devuelve { label, own } o null si no es un http(s) válido
+    function linkInfo(href) {
+      let u
+      try { u = new URL(href) } catch { return null }
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return null
+
+      const host = u.hostname.replace(/^www\./, '')
+      const rest = prettyPath((u.pathname === '/' ? '' : u.pathname.replace(/\/$/, '')) + u.search + u.hash)
+
+      // Proyectos propios: naoxink.github.io/foo → "naoxink/foo"
+      if (host === OWN_HOST) return { label: 'naoxink' + rest, own: true }
+
+      const full = host + rest
+      return { label: full.length > 40 ? full.slice(0, 39) + '…' : full, own: false }
+    }
+
+    // Hashtags dentro de un trozo de texto sin enlaces
+    function parseHashtags(text, parts) {
       let last = 0
       for (const m of text.matchAll(HASHTAG_RE)) {
         const start = m.index + m[1].length
@@ -435,37 +488,53 @@
         last = start + 1 + m[2].length
       }
       if (last < text.length) parts.push({ text: text.slice(last) })
+    }
+
+    // Divide el texto en trozos { text }, { text, tag } y { text, href, own }.
+    // Primero se sacan los enlaces para que un "#ancla" de una URL no cuente como hashtag.
+    function parseContent(text) {
+      const parts = []
+      let last = 0
+      for (const m of text.matchAll(URL_RE)) {
+        const href = trimUrl(m[0])
+        const info = linkInfo(href)
+        if (!info) continue
+        if (m.index > last) parseHashtags(text.slice(last, m.index), parts)
+        parts.push({ text: info.label, href, own: info.own })
+        last = m.index + href.length
+      }
+      if (last < text.length) parseHashtags(text.slice(last), parts)
       return parts
     }
- 
+
     // El estado vive en la URL: ?tag=foo (filtro) o ?post=<id> (permalink).
     // Así es enlazable y el botón "atrás" funciona. Si vienen los dos, manda ?post.
     const POST_ID_RE = /^[\w-]{1,64}$/
- 
+
     function readState() {
       const q = new URLSearchParams(location.search)
- 
+
       const post = q.get('post') || ''
       if (POST_ID_RE.test(post)) return { tag: '', post }
- 
+
       const t = (q.get('tag') || '').replace(/^#/, '').toLowerCase()
       // Se valida porque acaba dentro de una expresión regular en la consulta
       return { tag: t.length <= 64 && TAG_VALID.test(t) ? t : '', post: '' }
     }
- 
+
     const baseUrl = location.pathname
     const tagUrl = (t) => `${baseUrl}?tag=${encodeURIComponent(t.toLowerCase())}`
     const postUrl = (id) => `${baseUrl}?post=${encodeURIComponent(id)}`
- 
+
     // Clic normal (los modificadores dejan que el navegador abra otra pestaña)
     const isPlainClick = (e) => !(e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
- 
+
     const PAGE_SIZE = 25
- 
+
     createApp({
       setup() {
         const initial = readState()
- 
+
         const posts = ref([])
         const loading = ref(true)        // carga inicial
         const loadingMore = ref(false)   // cargando una página
@@ -475,10 +544,10 @@
         const tag = ref(initial.tag)     // hashtag filtrado ('' = todos)
         const postId = ref(initial.post) // permalink activo ('' = feed)
         const copiedId = ref(null)       // post cuyo enlace se acaba de copiar
- 
+
         let gen = 0                      // descarta respuestas de consultas obsoletas
         let copiedTimer
- 
+
         // Publicación individual (permalink)
         async function loadOne() {
           const myGen = gen
@@ -488,7 +557,7 @@
             .eq('id', postId.value)
             .maybeSingle()
           if (myGen !== gen) return
- 
+
           // 22P02: el id no tiene formato válido para la columna → equivale a "no existe"
           if (err && err.code !== '22P02') {
             error.value = 'No se pudo cargar la publicación. Recarga la página para reintentar.'
@@ -496,12 +565,12 @@
             posts.value = [{ ...data, parts: parseContent(data.content) }]
             document.title = `${excerpt(data.content, 60)} · ${SITE_TITLE}`
           }
- 
+
           hasMore.value = false
           loading.value = false
           loadingMore.value = false
         }
- 
+
         async function loadMore(fresh = false) {
           if (loadingMore.value && !fresh) return
           loadingMore.value = true
@@ -556,7 +625,7 @@
           loading.value = true
           loadMore()
         }
- 
+
         // Cambia de vista (feed, hashtag o permalink) y sincroniza la URL
         function go(t, p, url) {
           if (t === tag.value && p === postId.value) return
@@ -566,21 +635,21 @@
           window.scrollTo(0, 0)
           reload()
         }
- 
+
         function openTag(t, e) {
           if (!isPlainClick(e)) return
           e.preventDefault()
           go(t.toLowerCase(), '', tagUrl(t))
         }
- 
+
         function openPost(id, e) {
           if (!isPlainClick(e)) return
           e.preventDefault()
           go('', String(id), postUrl(id))
         }
- 
+
         function clearFilter() { go('', '', baseUrl) }
- 
+
         const randomLoading = ref(false)
 
         // Post aleatorio: cuenta los posts y pide uno con offset al azar
@@ -618,10 +687,10 @@
             window.prompt('Copia el enlace:', url)
           }
         }
- 
+
         async function share(post) {
           const url = new URL(postUrl(post.id), location.origin).href
- 
+
           // Hoja nativa de compartir (móvil y Safari); si no existe, copiamos el enlace
           if (navigator.share) {
             try {
@@ -634,15 +703,15 @@
           }
           copyLink(post.id, url)
         }
- 
+
         watch([tag, postId], ([t]) => {
           // El título de un permalink se fija al cargar la publicación (loadOne)
           document.title = t ? `#${t} · ${SITE_TITLE}` : SITE_TITLE
         }, { immediate: true })
- 
+
         const showTop = ref(false)
         const onScroll = () => { showTop.value = window.scrollY > 600 }
- 
+
         onMounted(() => {
           window.addEventListener('scroll', onScroll, { passive: true })
           window.addEventListener('popstate', () => {
@@ -665,12 +734,12 @@
             window.addEventListener('touchcancel', onTouchEnd)
           }
         })
- 
+
         function scrollToTop() {
           const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
           window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
         }
- 
+
         // ---- Posts largos: colapsar / expandir ----
         const CLAMP_LINES = 4               // líneas visibles (debe coincidir con el CSS)
         const expanded = ref({})            // id -> true si se pulsó "Ver completa"
@@ -766,4 +835,3 @@
   </script>
 </body>
 </html>
- 
