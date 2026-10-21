@@ -147,6 +147,25 @@
 
     .state.ok { color: var(--accent); }
     .state.error { color: var(--danger); }
+
+    .stats { margin-top: 4rem; }
+    .stats h2 { margin: 0 0 1rem; font-size: 1.125rem; font-weight: 700; }
+
+    .range { display: flex; gap: 1.25rem; margin-bottom: 1rem; }
+    .range button {
+      padding: 0.25rem 0;
+      font-size: 0.9375rem;
+      color: var(--muted);
+      background: none;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+    }
+    .range button:hover { filter: none; color: var(--text); }
+    .range button[aria-pressed="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+    #chart { display: block; width: 100%; height: 220px; touch-action: pan-y; }
+    .stats .state { margin-top: 0.75rem; }
   </style>
 </head>
 <body>
@@ -176,6 +195,18 @@
 
         <p id="state" class="state" role="status" aria-live="polite"></p>
       </form>
+
+      <section id="stats" class="stats" hidden aria-labelledby="stats-title">
+        <h2 id="stats-title">Publicaciones a lo largo del tiempo</h2>
+        <div class="range" role="group" aria-label="Agrupar por">
+          <button type="button" data-g="day" aria-pressed="false">Día</button>
+          <button type="button" data-g="week" aria-pressed="false">Semana</button>
+          <button type="button" data-g="month" aria-pressed="false">Mes</button>
+        </div>
+        <canvas id="chart" role="img" aria-label="Gráfica de barras con el número de publicaciones por periodo"></canvas>
+        <p id="chart-info" class="state" aria-live="polite"></p>
+      </section>
+
     </main>
   </div>
 
@@ -215,6 +246,200 @@
       }
     })
 
+    // ---- Gráfica de publicaciones (solo con token válido) ----
+    const STATS_URL = 'https://microblog-eosin.vercel.app/api/post-stats'
+
+    const statsEl = document.getElementById('stats')
+    const canvas = document.getElementById('chart')
+    const infoEl = document.getElementById('chart-info')
+    const rangeBtns = document.querySelectorAll('.range button')
+
+    let days = null        // { 'YYYY-MM-DD': n }
+    let today = ''
+    let gran = null        // 'day' | 'week' | 'month'
+    let buckets = []       // [[clave, n], ...]
+    let geo = null         // geometría para el hover
+    let statsGen = 0       // descarta respuestas obsoletas
+
+    const addDays = (s, n) => {
+      const d = new Date(s + 'T00:00:00Z')
+      d.setUTCDate(d.getUTCDate() + n)
+      return d.toISOString().slice(0, 10)
+    }
+    const weekStart = (s) => addDays(s, -((new Date(s + 'T00:00:00Z').getUTCDay() + 6) % 7)) // lunes
+    const bucketKey = (s) => gran === 'month' ? s.slice(0, 7) : gran === 'week' ? weekStart(s) : s
+    const dateOf = (k) => new Date((k.length === 7 ? k + '-01' : k) + 'T00:00:00Z')
+
+    const fmtAxis = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC' })
+    const fmtAxisMonth = new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+    const fmtFull = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+    const fmtFullMonth = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+
+    const axisLabel = (k) => (gran === 'month' ? fmtAxisMonth : fmtAxis).format(dateOf(k))
+    const fullLabel = (k) =>
+      gran === 'month' ? fmtFullMonth.format(dateOf(k))
+      : gran === 'week' ? 'Semana del ' + fmtFull.format(dateOf(k))
+      : fmtFull.format(dateOf(k))
+    const posts = (n) => `${n} ${n === 1 ? 'publicación' : 'publicaciones'}`
+
+    function buildBuckets() {
+      const first = Object.keys(days).sort()[0] || today
+      const out = new Map()
+      // Se recorre día a día para que los periodos vacíos cuenten como 0
+      for (let d = first; d <= today; d = addDays(d, 1)) {
+        const k = bucketKey(d)
+        out.set(k, (out.get(k) || 0) + (days[d] || 0))
+      }
+      return [...out]
+    }
+
+    function niceStep(max) {
+      const t = max / 4
+      const p = 10 ** Math.floor(Math.log10(t))
+      const f = t / p
+      return Math.max(1, (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p)
+    }
+
+    function summary() {
+      const total = buckets.reduce((s, [, n]) => s + n, 0)
+      const max = Math.max(...buckets.map(([, n]) => n))
+      const unit = gran === 'month' ? 'mes' : gran === 'week' ? 'semana' : 'día'
+      infoEl.textContent = `Total: ${posts(total)} · máximo: ${posts(max)} en un ${unit}`
+    }
+
+    function draw() {
+      const dpr = window.devicePixelRatio || 1
+      const w = canvas.clientWidth
+      const h = canvas.clientHeight
+      if (!w) return
+      canvas.width = Math.round(w * dpr)
+      canvas.height = Math.round(h * dpr)
+      const ctx = canvas.getContext('2d')
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.clearRect(0, 0, w, h)
+
+      const root = getComputedStyle(document.documentElement)
+      const accent = root.getPropertyValue('--accent').trim()
+      const muted = root.getPropertyValue('--muted').trim()
+      const line = root.getPropertyValue('--line').trim()
+      ctx.font = `12px ${getComputedStyle(document.body).fontFamily}`
+
+      const max = Math.max(1, ...buckets.map(([, n]) => n))
+      const step = niceStep(max)
+      const top = Math.ceil(max / step) * step
+
+      const padL = Math.ceil(ctx.measureText(String(top)).width) + 12
+      const padR = 4, padT = 8, padB = 24
+      const plotW = w - padL - padR
+      const plotH = h - padT - padB
+      const yOf = (v) => padT + plotH - (v / top) * plotH
+
+      // Rejilla y eje Y
+      ctx.strokeStyle = line
+      ctx.fillStyle = muted
+      ctx.lineWidth = 1
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'middle'
+      for (let v = 0; v <= top; v += step) {
+        const y = Math.round(yOf(v)) + 0.5
+        ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke()
+        ctx.fillText(String(v), padL - 6, y)
+      }
+
+      // Barras
+      const n = buckets.length
+      const slot = plotW / n
+      const bw = Math.max(1, slot * 0.7)
+      ctx.fillStyle = accent
+      buckets.forEach(([, c], i) => {
+        if (!c) return
+        const x = padL + i * slot + (slot - bw) / 2
+        ctx.fillRect(x, yOf(c), bw, yOf(0) - yOf(c))
+      })
+
+      // Eje X: primero, medio y último
+      ctx.fillStyle = muted
+      ctx.textBaseline = 'alphabetic'
+      const yText = h - 6
+      ctx.textAlign = 'left'
+      ctx.fillText(axisLabel(buckets[0][0]), padL, yText)
+      if (n > 1) {
+        ctx.textAlign = 'right'
+        ctx.fillText(axisLabel(buckets[n - 1][0]), w - padR, yText)
+      }
+      if (n >= 5) {
+        ctx.textAlign = 'center'
+        ctx.fillText(axisLabel(buckets[Math.floor((n - 1) / 2)][0]), padL + plotW / 2, yText)
+      }
+
+      geo = { padL, slot, n }
+    }
+
+    function render() {
+      rangeBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.g === gran)))
+      buckets = buildBuckets()
+      draw()
+      summary()
+    }
+
+    function hideStats() {
+      statsGen++
+      statsEl.hidden = true
+      days = null
+    }
+
+    async function loadStats() {
+      const token = tokenEl.value.trim()
+      if (!token) { hideStats(); return }
+
+      const myGen = ++statsGen
+      try {
+        const res = await fetch(STATS_URL, { headers: { 'Authorization': `Bearer ${token}` } })
+        if (myGen !== statsGen) return
+
+        if (!res.ok) {
+          statsEl.hidden = true
+          days = null
+          if (res.status === 401) setState('Token incorrecto.', 'error')
+          else if (res.status === 429) setState('Demasiados intentos con el token.', 'error')
+          return
+        }
+
+        const data = await res.json()
+        if (myGen !== statsGen) return
+        days = data.days
+        today = data.today
+        if (!gran) {
+          const first = Object.keys(days).sort()[0] || today
+          const span = (new Date(today) - new Date(first)) / 86400000
+          gran = span <= 90 ? 'day' : 'week'
+        }
+        statsEl.hidden = false   // el canvas necesita estar visible para medir su ancho
+        render()
+      } catch {
+        if (myGen === statsGen) statsEl.hidden = true
+      }
+    }
+
+    rangeBtns.forEach(b => b.addEventListener('click', () => { gran = b.dataset.g; render() }))
+
+    // Hover / toque: muestra el valor de la barra bajo el puntero
+    canvas.addEventListener('pointermove', (e) => {
+      if (!geo) return
+      const x = e.clientX - canvas.getBoundingClientRect().left
+      const i = Math.floor((x - geo.padL) / geo.slot)
+      if (i < 0 || i >= geo.n) { summary(); return }
+      const [k, c] = buckets[i]
+      infoEl.textContent = `${fullLabel(k)} · ${posts(c)}`
+    })
+    canvas.addEventListener('pointerleave', () => { if (days) summary() })
+
+    window.addEventListener('resize', () => { if (!statsEl.hidden && days) draw() })
+
+    // El token cambió: la gráfica se oculta hasta validarlo de nuevo (al salir del campo)
+    tokenEl.addEventListener('input', hideStats)
+    tokenEl.addEventListener('change', loadStats)
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
       if (sendEl.disabled) return
@@ -244,6 +469,7 @@
           updateCount()
           setState('Publicado.', 'ok')
           contentEl.focus()
+          loadStats()
         } else if (res.status === 401) {
           setState('Token incorrecto.', 'error')
         } else if (res.status === 429) {

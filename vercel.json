@@ -2,7 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "functions": {
-    "api/insert-post.js": { "maxDuration": 10 }
+    "api/insert-post.js": { "maxDuration": 10 },
+    "api/post-stats.js": { "maxDuration": 10 }
   },
   "headers": [
     {
