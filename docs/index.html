@@ -233,6 +233,29 @@
     .random-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
     .random-btn:disabled { color: var(--muted); cursor: default; text-decoration: none; }
 
+    .tools { display: flex; flex-wrap: wrap; gap: 0 1.25rem; }
+    .tool {
+      display: inline-block;
+      margin-top: 0.75rem;
+      padding: 0.25rem 0;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .tool:hover { text-decoration: underline; }
+    .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+    .tag-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+    .tag-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .tag-list .n { font-size: 0.9375rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
     .more .state { padding-top: 1.25rem; text-align: center; }
 
     .hl { color: var(--accent); }
@@ -343,22 +366,42 @@
       <div class="wrap" :style="wrapStyle">
       <header>
         <h1><a :href="baseUrl" style="color: inherit; text-decoration: none" @click.prevent="clearFilter"><span class="hl">naoxink</span>'s microblog</a></h1>
-        <button type="button" class="random-btn" :disabled="randomLoading" @click="openRandom">
-          {{ randomLoading ? 'Buscando…' : '🎲 Post aleatorio' }}
-        </button>
+        <div class="tools">
+          <button type="button" class="random-btn" :disabled="randomLoading" @click="openRandom">
+            {{ randomLoading ? 'Buscando…' : '🎲 Post aleatorio' }}
+          </button>
+          <a class="tool" :href="hoyUrl" @click="openView('hoy', $event)">📅 Un día como hoy</a>
+          <a class="tool" :href="tagsUrl" @click="openView('tags', $event)">#️⃣ Etiquetas</a>
+        </div>
       </header>
 
       <main>
-        <div v-if="tag || postId" class="filter">
+        <div v-if="tag || postId || view" class="filter">
           <p v-if="tag">Publicaciones con <strong class="hl">#{{ tag }}</strong></p>
-          <p v-else>Publicación individual</p>
+          <p v-else-if="postId">Publicación individual</p>
+          <p v-else-if="view === 'hoy'">Un día como hoy</p>
+          <p v-else>Etiquetas</p>
           <a :href="baseUrl" @click.prevent="clearFilter">Ver todos</a>
         </div>
 
         <p v-if="loading" class="state" role="status">Cargando…</p>
         <p v-else-if="error" class="state error" role="alert">{{ error }}</p>
+
+        <template v-else-if="view === 'tags'">
+          <p v-if="!tags.length" class="state">Aún no hay etiquetas.</p>
+          <ul v-else class="tag-list">
+            <li v-for="t in tags" :key="t.tag">
+              <a class="tag" :href="tagUrl(t.tag)" @click="openTag(t.tag, $event)">#{{ t.tag }}</a>
+              <span class="n">{{ t.uses }}</span>
+            </li>
+          </ul>
+        </template>
+
         <p v-else-if="!posts.length" class="state">
-          {{ postId ? 'Esta publicación no existe.' : tag ? 'No hay publicaciones con #' + tag + '.' : 'Aún no hay publicaciones.' }}
+          {{ postId ? 'Esta publicación no existe.'
+            : view === 'hoy' ? 'No hay publicaciones de este día en años anteriores.'
+            : tag ? 'No hay publicaciones con #' + tag + '.'
+            : 'Aún no hay publicaciones.' }}
         </p>
 
         <ol v-else class="timeline">
@@ -515,14 +558,18 @@
       const q = new URLSearchParams(location.search)
 
       const post = q.get('post') || ''
-      if (POST_ID_RE.test(post)) return { tag: '', post }
+      if (POST_ID_RE.test(post)) return { tag: '', post, view: '' }
+      if (q.has('hoy')) return { tag: '', post: '', view: 'hoy' }
+      if (q.has('etiquetas')) return { tag: '', post: '', view: 'tags' }
 
       const t = (q.get('tag') || '').replace(/^#/, '').toLowerCase()
-      // Se valida porque acaba dentro de una expresión regular en la consulta
-      return { tag: t.length <= 64 && TAG_VALID.test(t) ? t : '', post: '' }
+      return { tag: t.length <= 64 && TAG_VALID.test(t) ? t : '', post: '', view: '' }
     }
 
+
     const baseUrl = location.pathname
+    const hoyUrl = `${baseUrl}?hoy`
+    const tagsUrl = `${baseUrl}?etiquetas`
     const tagUrl = (t) => `${baseUrl}?tag=${encodeURIComponent(t.toLowerCase())}`
     const postUrl = (id) => `${baseUrl}?post=${encodeURIComponent(id)}`
 
@@ -543,6 +590,8 @@
         const moreError = ref(false)     // error al cargar más
         const tag = ref(initial.tag)     // hashtag filtrado ('' = todos)
         const postId = ref(initial.post) // permalink activo ('' = feed)
+        const view = ref(initial.view)   // '' | 'hoy' | 'tags'
+        const tags = ref([])
         const copiedId = ref(null)       // post cuyo enlace se acaba de copiar
 
         let gen = 0                      // descarta respuestas de consultas obsoletas
@@ -571,12 +620,47 @@
           loadingMore.value = false
         }
 
+        async function loadToday() {
+          const myGen = gen
+          const now = new Date()
+          const { data, error: err } = await db
+            .rpc('posts_on_this_day', {
+              p_month: now.getMonth() + 1,
+              p_day: now.getDate(),
+              p_year: now.getFullYear()
+            })
+            .select('id, content, created_at')
+          if (myGen !== gen) return
+
+          if (err) error.value = 'No se pudieron cargar los posts. Recarga la página para reintentar.'
+          else posts.value = data.map(p => ({ ...p, parts: parseContent(p.content) }))
+
+          hasMore.value = false
+          loading.value = false
+          loadingMore.value = false
+        }
+
+        async function loadTags() {
+          const myGen = gen
+          const { data, error: err } = await db.rpc('tag_counts')
+          if (myGen !== gen) return
+
+          if (err) error.value = 'No se pudieron cargar las etiquetas. Recarga la página para reintentar.'
+          else tags.value = data
+
+          hasMore.value = false
+          loading.value = false
+          loadingMore.value = false
+        }
+
         async function loadMore(fresh = false) {
           if (loadingMore.value && !fresh) return
           loadingMore.value = true
           moreError.value = false
 
           if (postId.value) return loadOne()
+          if (view.value === 'hoy') return loadToday()
+          if (view.value === 'tags') return loadTags()
 
           const myGen = gen
 
@@ -709,6 +793,14 @@
           document.title = t ? `#${t} · ${SITE_TITLE}` : SITE_TITLE
         }, { immediate: true })
 
+        watch([tag, postId, view], ([t, , v]) => {
+          document.title =
+            v === 'hoy' ? `Un día como hoy · ${SITE_TITLE}`
+            : v === 'tags' ? `Etiquetas · ${SITE_TITLE}`
+            : t ? `#${t} · ${SITE_TITLE}`
+            : SITE_TITLE
+        }, { immediate: true })
+
         const showTop = ref(false)
         const onScroll = () => { showTop.value = window.scrollY > 600 }
 
@@ -821,6 +913,32 @@
           transition: pulling.value ? 'none' : 'transform 0.2s ease-out, opacity 0.2s'
         }))
 
+        function go(t, p, url, v = '') {
+          if (t === tag.value && p === postId.value && v === view.value) return
+          history.pushState(null, '', url)
+          tag.value = t
+          postId.value = p
+          view.value = v
+          window.scrollTo(0, 0)
+          reload()
+        }
+
+        function openView(v, e) {
+          if (!isPlainClick(e)) return
+          e.preventDefault()
+          go('', '', v === 'hoy' ? hoyUrl : tagsUrl, v)
+        }
+
+        window.addEventListener('popstate', () => {
+          const s = readState()
+          if (s.tag !== tag.value || s.post !== postId.value || s.view !== view.value) {
+            tag.value = s.tag
+            postId.value = s.post
+            view.value = s.view
+            reload()
+          }
+        })
+
         return {
           posts, loading, loadingMore, hasMore, error, moreError, loadMore,
           tag, postId, openTag, openPost, clearFilter, baseUrl, tagUrl, postUrl,
@@ -828,7 +946,7 @@
           showTop, scrollToTop, displayDate, fullDate,
           openRandom, randomLoading,
           isClamped, canExpand, expand,
-          pull, refreshing, wrapStyle, ptrStyle
+          pull, refreshing, wrapStyle, ptrStyle, view, tags, openView, hoyUrl, tagsUrl
         }
       }
     }).mount('#app')
