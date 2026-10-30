@@ -246,6 +246,19 @@
     .tool:hover { text-decoration: underline; }
     .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 
+    .hoy-tabs { display: flex; gap: 1.25rem; margin-bottom: 1.25rem; }
+    .hoy-tabs a {
+      padding: 0.25rem 0;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+    }
+    .hoy-tabs a:hover { color: var(--text); }
+    .hoy-tabs a.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .hoy-tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
     .tag-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
     .tag-list li {
       display: flex;
@@ -384,6 +397,13 @@
           <a :href="baseUrl" @click.prevent="clearFilter">Ver todos</a>
         </div>
 
+        <nav v-if="view === 'hoy'" class="hoy-tabs" aria-label="Periodo">
+          <a :href="hoyUrlFor('meses')" :class="{ active: hoyMode === 'meses' }"
+            @click="setHoyMode('meses', $event)">Meses anteriores</a>
+          <a :href="hoyUrlFor('anios')" :class="{ active: hoyMode === 'anios' }"
+            @click="setHoyMode('anios', $event)">Años anteriores</a>
+        </nav>
+
         <p v-if="loading" class="state" role="status">Cargando…</p>
         <p v-else-if="error" class="state error" role="alert">{{ error }}</p>
 
@@ -399,7 +419,9 @@
 
         <p v-else-if="!posts.length" class="state">
           {{ postId ? 'Esta publicación no existe.'
-            : view === 'hoy' ? 'No hay publicaciones de este día en años anteriores.'
+            : view === 'hoy' ? (hoyMode === 'anios'
+              ? 'No hay publicaciones de este día en años anteriores.'
+              : 'No hay publicaciones de este día en meses anteriores.')
             : tag ? 'No hay publicaciones con #' + tag + '.'
             : 'Aún no hay publicaciones.' }}
         </p>
@@ -409,7 +431,6 @@
             <p class="text" :data-id="post.id" :class="{ clamped: isClamped(post.id) }"><template v-for="(part, i) in post.parts" :key="i"><a v-if="part.tag" class="tag" :class="{ active: part.tag.toLowerCase() === tag }" :href="tagUrl(part.tag)" @click="openTag(part.tag, $event)">{{ part.text }}</a><a v-else-if="part.href" class="link" :class="{ own: part.own }" :href="part.href" target="_blank" rel="noopener noreferrer" :title="part.href">{{ part.text }}</a><template v-else>{{ part.text }}</template></template></p>
             <button v-if="canExpand(post.id)" type="button" class="expand-btn"
                     aria-expanded="false" @click="expand(post.id)">Ver completa</button>
-            <div class="meta">
             <div class="meta">
               <a class="permalink" :href="postUrl(post.id)" @click="openPost(post.id, $event)">
                 <time :datetime="post.created_at" :title="fullDate(post.created_at)">{{ displayDate(post.created_at) }}</time>
@@ -558,17 +579,18 @@
       const q = new URLSearchParams(location.search)
 
       const post = q.get('post') || ''
-      if (POST_ID_RE.test(post)) return { tag: '', post, view: '' }
-      if (q.has('hoy')) return { tag: '', post: '', view: 'hoy' }
-      if (q.has('etiquetas')) return { tag: '', post: '', view: 'tags' }
+      if (POST_ID_RE.test(post)) return { tag: '', post, view: '', mode: 'meses' }
+      if (q.has('hoy')) return { tag: '', post: '', view: 'hoy', mode: q.get('hoy') === 'anios' ? 'anios' : 'meses' }
+      if (q.has('etiquetas')) return { tag: '', post: '', view: 'tags', mode: 'meses' }
 
       const t = (q.get('tag') || '').replace(/^#/, '').toLowerCase()
-      return { tag: t.length <= 64 && TAG_VALID.test(t) ? t : '', post: '', view: '' }
+      return { tag: t.length <= 64 && TAG_VALID.test(t) ? t : '', post: '', view: '', mode: 'meses' }
     }
 
 
     const baseUrl = location.pathname
     const hoyUrl = `${baseUrl}?hoy`
+    const hoyUrlFor = (m) => m === 'anios' ? `${baseUrl}?hoy=anios` : hoyUrl
     const tagsUrl = `${baseUrl}?etiquetas`
     const tagUrl = (t) => `${baseUrl}?tag=${encodeURIComponent(t.toLowerCase())}`
     const postUrl = (id) => `${baseUrl}?post=${encodeURIComponent(id)}`
@@ -591,6 +613,7 @@
         const tag = ref(initial.tag)     // hashtag filtrado ('' = todos)
         const postId = ref(initial.post) // permalink activo ('' = feed)
         const view = ref(initial.view)   // '' | 'hoy' | 'tags'
+        const hoyMode = ref(initial.mode)
         const tags = ref([])
         const copiedId = ref(null)       // post cuyo enlace se acaba de copiar
 
@@ -623,12 +646,9 @@
         async function loadToday() {
           const myGen = gen
           const now = new Date()
+          const rpcName = hoyMode.value === 'anios' ? 'posts_on_this_day' : 'posts_on_this_day_months'
           const { data, error: err } = await db
-            .rpc('posts_on_this_day', {
-              p_month: now.getMonth() + 1,
-              p_day: now.getDate(),
-              p_year: now.getFullYear()
-            })
+            .rpc(rpcName, { p_month: now.getMonth() + 1, p_day: now.getDate(), p_year: now.getFullYear() })
             .select('id, content, created_at')
           if (myGen !== gen) return
 
@@ -710,16 +730,6 @@
           loadMore()
         }
 
-        // Cambia de vista (feed, hashtag o permalink) y sincroniza la URL
-        function go(t, p, url) {
-          if (t === tag.value && p === postId.value) return
-          history.pushState(null, '', url)
-          tag.value = t
-          postId.value = p
-          window.scrollTo(0, 0)
-          reload()
-        }
-
         function openTag(t, e) {
           if (!isPlainClick(e)) return
           e.preventDefault()
@@ -788,11 +798,6 @@
           copyLink(post.id, url)
         }
 
-        watch([tag, postId], ([t]) => {
-          // El título de un permalink se fija al cargar la publicación (loadOne)
-          document.title = t ? `#${t} · ${SITE_TITLE}` : SITE_TITLE
-        }, { immediate: true })
-
         watch([tag, postId, view], ([t, , v]) => {
           document.title =
             v === 'hoy' ? `Un día como hoy · ${SITE_TITLE}`
@@ -806,14 +811,6 @@
 
         onMounted(() => {
           window.addEventListener('scroll', onScroll, { passive: true })
-          window.addEventListener('popstate', () => {
-            const s = readState()
-            if (s.tag !== tag.value || s.post !== postId.value) {
-              tag.value = s.tag
-              postId.value = s.post
-              reload()
-            }
-          })
           onScroll()
           loadMore()
           window.addEventListener('resize', onResize)
@@ -913,12 +910,13 @@
           transition: pulling.value ? 'none' : 'transform 0.2s ease-out, opacity 0.2s'
         }))
 
-        function go(t, p, url, v = '') {
-          if (t === tag.value && p === postId.value && v === view.value) return
+        function go(t, p, url, v = '', m = hoyMode.value) {
+          if (t === tag.value && p === postId.value && v === view.value && m === hoyMode.value) return
           history.pushState(null, '', url)
           tag.value = t
           postId.value = p
           view.value = v
+          hoyMode.value = m
           window.scrollTo(0, 0)
           reload()
         }
@@ -926,15 +924,22 @@
         function openView(v, e) {
           if (!isPlainClick(e)) return
           e.preventDefault()
-          go('', '', v === 'hoy' ? hoyUrl : tagsUrl, v)
+          go('', '', v === 'hoy' ? hoyUrl : tagsUrl, v, 'meses')
+        }
+
+        function setHoyMode(m, e) {
+          if (!isPlainClick(e)) return
+          e.preventDefault()
+          go('', '', hoyUrlFor(m), 'hoy', m)
         }
 
         window.addEventListener('popstate', () => {
           const s = readState()
-          if (s.tag !== tag.value || s.post !== postId.value || s.view !== view.value) {
+          if (s.tag !== tag.value || s.post !== postId.value || s.view !== view.value || s.mode !== hoyMode.value) {
             tag.value = s.tag
             postId.value = s.post
             view.value = s.view
+            hoyMode.value = s.mode
             reload()
           }
         })
@@ -946,7 +951,8 @@
           showTop, scrollToTop, displayDate, fullDate,
           openRandom, randomLoading,
           isClamped, canExpand, expand,
-          pull, refreshing, wrapStyle, ptrStyle, view, tags, openView, hoyUrl, tagsUrl
+          pull, refreshing, wrapStyle, ptrStyle, view, tags, openView, hoyUrl, tagsUrl,
+          hoyMode, setHoyMode, hoyUrlFor
         }
       }
     }).mount('#app')
