@@ -364,6 +364,16 @@
     @media (prefers-reduced-motion: reduce) {
       .ptr.spin svg { animation: none; }
     }
+
+    /* Citas: líneas que empiezan por "> " */
+    .quote {
+      margin: 0.75em 0;
+      padding-left: 1rem;
+      border-left: 3px solid var(--accent);
+      color: var(--muted);
+    }
+    .text > :first-child { margin-top: 0; }
+    .text > :last-child { margin-bottom: 0; }
   </style>
 </head>
 <body>
@@ -428,7 +438,7 @@
 
         <ol v-else class="timeline">
           <li v-for="post in posts" :key="post.id" class="post">
-            <p class="text" :data-id="post.id" :class="{ clamped: isClamped(post.id) }"><template v-for="(part, i) in post.parts" :key="i"><a v-if="part.tag" class="tag" :class="{ active: part.tag.toLowerCase() === tag }" :href="tagUrl(part.tag)" @click="openTag(part.tag, $event)">{{ part.text }}</a><a v-else-if="part.href" class="link" :class="{ own: part.own }" :href="part.href" target="_blank" rel="noopener noreferrer" :title="part.href">{{ part.text }}</a><template v-else>{{ part.text }}</template></template></p>
+            <div class="text" :data-id="post.id" :class="{ clamped: isClamped(post.id) }"><component :is="b.quote ? 'blockquote' : 'div'" v-for="(b, bi) in post.blocks" :key="bi" :class="{ quote: b.quote }"><template v-for="(part, i) in b.parts" :key="i"><a v-if="part.tag" class="tag" :class="{ active: part.tag.toLowerCase() === tag }" :href="tagUrl(part.tag)" @click="openTag(part.tag, $event)">{{ part.text }}</a><a v-else-if="part.href" class="link" :class="{ own: part.own }" :href="part.href" target="_blank" rel="noopener noreferrer" :title="part.href">{{ part.text }}</a><template v-else>{{ part.text }}</template></template></component></div>
             <button v-if="canExpand(post.id)" type="button" class="expand-btn"
                     aria-expanded="false" @click="expand(post.id)">Ver completa</button>
             <div class="meta">
@@ -502,7 +512,7 @@
 
     // Texto en una sola línea y recortado (para títulos y para compartir)
     function excerpt(text, max) {
-      const one = text.replace(/\s+/g, ' ').trim()
+      const one = text.replace(/^> /gm, '').replace(/\s+/g, ' ').trim()
       return one.length > max ? one.slice(0, max - 1) + '…' : one
     }
 
@@ -556,7 +566,7 @@
 
     // Divide el texto en trozos { text }, { text, tag } y { text, href, own }.
     // Primero se sacan los enlaces para que un "#ancla" de una URL no cuente como hashtag.
-    function parseContent(text) {
+    function parseInline(text) {
       const parts = []
       let last = 0
       for (const m of text.matchAll(URL_RE)) {
@@ -569,6 +579,36 @@
       }
       if (last < text.length) parseHashtags(text.slice(last), parts)
       return parts
+    }
+
+    // ---- Citas ----
+    // Una cita empieza en una línea que empiece por "> " y dura hasta la primera línea
+    // en blanco (un solo salto de línea no la corta). Devuelve bloques { quote, parts }.
+    function parseContent(text) {
+      const blocks = []
+      let lines = []
+      let inQuote = false
+
+      const flush = () => {
+        const body = lines.join('\n').replace(/^\n+|\n+$/g, '')
+        if (body) blocks.push({ quote: inQuote, parts: parseInline(body) })
+        lines = []
+      }
+
+      for (const line of text.replace(/\r\n?/g, '\n').split('\n')) {
+        if (inQuote) {
+          if (!line.trim()) { flush(); inQuote = false; continue }
+          lines.push(line.replace(/^> /, ''))   // las líneas siguientes pueden llevar "> " o no
+        } else if (line.startsWith('> ')) {
+          flush()
+          inQuote = true
+          lines.push(line.slice(2))
+        } else {
+          lines.push(line)
+        }
+      }
+      flush()
+      return blocks
     }
 
     // El estado vive en la URL: ?tag=foo (filtro) o ?post=<id> (permalink).
@@ -634,7 +674,7 @@
           if (err && err.code !== '22P02') {
             error.value = 'No se pudo cargar la publicación. Recarga la página para reintentar.'
           } else if (data) {
-            posts.value = [{ ...data, parts: parseContent(data.content) }]
+            posts.value = [{ ...data, blocks: parseContent(data.content) }]
             document.title = `${excerpt(data.content, 60)} · ${SITE_TITLE}`
           }
 
@@ -653,7 +693,7 @@
           if (myGen !== gen) return
 
           if (err) error.value = 'No se pudieron cargar los posts. Recarga la página para reintentar.'
-          else posts.value = data.map(p => ({ ...p, parts: parseContent(p.content) }))
+          else posts.value = data.map(p => ({ ...p, blocks: parseContent(p.content) }))
 
           hasMore.value = false
           loading.value = false
@@ -709,7 +749,7 @@
             else error.value = 'No se pudieron cargar los posts. Recarga la página para reintentar.'
           } else {
             hasMore.value = data.length > PAGE_SIZE
-            const page = data.slice(0, PAGE_SIZE).map(p => ({ ...p, parts: parseContent(p.content) }))
+            const page = data.slice(0, PAGE_SIZE).map(p => ({ ...p, blocks: parseContent(p.content) }))
             if (fresh) posts.value = page
             else posts.value.push(...page)
           }
